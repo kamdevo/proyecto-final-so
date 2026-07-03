@@ -1,50 +1,9 @@
-"""
-VERSIÓN 2 — ROBUSTA: segura + equitativa
-
-Autores:
-Jefferson Gomez 
-Juan Camilo Morales 
-Marilyn Grijalba
-Juan Diego Quiñonez
-Jorge Castro
-==========================================
-Escenario 1: Puente de un solo carril — Taller Final Concurrencia
-Curso: Sistemas Operativos — Universidad del Valle 2026-1
-
-Propósito de este archivo:
-    Agrega un mecanismo de RELEVO sobre la V1 para eliminar la
-    inanición. Cuando hay vehículos del sentido contrario esperando,
-    se cierra la entrada a nuevos vehículos del sentido actual,
-    aunque el puente todavía esté en uso.
-
-Mecanismo de equidad (relevo por conteo de espera):
-    - Cada sentido lleva su propio contador de vehículos ESPERANDO.
-    - La condición de entrada incluye: si hay alguien del contrario
-      esperando Y ya hay vehículos del sentido actual en el puente,
-      los nuevos del sentido actual esperan también.
-    - Así, el puente se vaciará y el turno pasará al sentido contrario.
-
-Referencia Stallings Cap. 5:
-    Equivalente a la variante "justo" del problema lectores-escritores,
-    donde se agrega un semáforo de turno para que los escritores no
-    sufran inanición ante una llegada continua de lectores.
-"""
-
 import threading
 import time
 import random
 import statistics
 
 class PuenteEquitativo:
-    """
-    Puente con exclusión mutua direccional Y garantía de equidad.
-
-    Propiedades garantizadas:
-        1. Seguridad   — invariante nunca violado.
-        2. Vivacidad   — sin deadlock (notify_all siempre despierta hilos).
-        3. Equidad     — ningún sentido espera indefinidamente.
-    """
-
     def __init__(self):
         self._condition       = threading.Condition()
         self._direction       = None  # Sentido actual (None = libre)
@@ -73,16 +32,7 @@ class PuenteEquitativo:
 
     # ── CONDICIÓN DE ENTRADA (política de equidad) ───────────────
     def _puede_entrar(self, direction):
-        """
-        Un vehículo puede entrar si:
-            a) El puente está libre (direction == None), O
-            b) El puente tiene su mismo sentido Y nadie del contrario espera.
-
-        La condición (b) es la clave de la equidad:
-            Si hay alguien del contrario esperando, un nuevo vehículo
-            del sentido actual NO entra aunque técnicamente podría.
-            Esto garantiza que el turno cambie cuando se vacíe el puente.
-        """
+    
         contrario = "SUR" if direction == "NORTE" else "NORTE"
 
         if self._direction is None:
@@ -91,9 +41,8 @@ class PuenteEquitativo:
         if self._direction != direction:
             return False   # Puente ocupado por el contrario
 
-        # Mismo sentido, pero ¿hay alguien del contrario esperando?
         if self._esperando[contrario] > 0:
-            return False   # Cedo el paso: ya es turno del contrario
+            return False   # Cede el paso
 
         return True
 
@@ -101,7 +50,6 @@ class PuenteEquitativo:
     def entrar(self, vid, direction):
         """
         Solicita entrar. Bloquea si no se cumple la condición de equidad.
-        Registra tiempo de espera para métricas (Frente 5).
         """
         t_llegada = time.time()
 
@@ -150,7 +98,6 @@ class PuenteEquitativo:
     # ── REPORTE DE MÉTRICAS ──────────────────────────────────────
     def reporte(self):
         print()
-        print("  ── Métricas (Frente 5) ──────────────────────────")
         for d in ("NORTE", "SUR"):
             tiempos = self.tiempos_espera[d]
             if tiempos:
@@ -195,14 +142,7 @@ def prueba_normal():
 
 # ── CARGA ADVERSA (demuestra equidad) ────────────────────────────
 def prueba_carga_adversa():
-    """
-    Carga adversa diseñada por el equipo para provocar inanición:
-        - Generador Norte: lanza vehículos sin parar durante 3 segundos.
-        - 10 vehículos Sur intentan cruzar uno por segundo.
 
-    Con V1 (sin equidad): los del sur esperan casi todo el tiempo.
-    Con V2 (con equidad): cada vehículo del sur cruza en tiempo acotado.
-    """
     print()
     print("── Carga adversa: Norte continuo vs Sur esporádico ──")
     puente = PuenteEquitativo()
@@ -256,15 +196,11 @@ def prueba_carga_adversa():
     print()
     print(f"  Espera máxima SUR: {max_espera*1000:.1f} ms")
     print(f"  Todos los del SUR cruzaron: "
-          f"{'SÍ ✓' if len(resultados_sur) == 10 else 'NO ✗'}")
+          f"{'SÍ ' if len(resultados_sur) == 10 else 'NO '}")
 
 
 # ── PRUEBA DE ESTRÉS ─────────────────────────────────────────────
 def prueba_estres():
-    """
-    50 Norte + 50 Sur lanzados casi simultáneamente.
-    Verifica que el invariante se mantenga bajo carga máxima.
-    """
     print()
     print("── Prueba de estrés: 50 Norte + 50 Sur simultáneos ──")
     puente = PuenteEquitativo()
@@ -286,13 +222,13 @@ def prueba_estres():
 
     puente.reporte()
     print(f"  Resultado: "
-          f"{'INVARIANTE RESPETADO ✓' if puente.violaciones == 0 else 'FALLO ✗'}")
+          f"{'INVARIANTE RESPETADO ' if puente.violaciones == 0 else 'FALLO '}")
 
 
 # ── MAIN ─────────────────────────────────────────────────────────
 def main():
     print("=" * 60)
-    print("VERSIÓN 2 — ROBUSTA: segura + equitativa")
+    print("VERSIÓN 2 — ROBUSTA")
     print("Mecanismo: relevo por conteo de espera")
     print("=" * 60)
 
@@ -301,12 +237,7 @@ def main():
     prueba_estres()
 
     print()
-    print("=" * 60)
-    print("Resumen de garantías:")
-    print("  Seguridad  → invariante nunca violado (aserción ejecutable)")
-    print("  Vivacidad  → notify_all() garantiza que nadie duerme para siempre")
-    print("  Equidad    → conteo de espera impide inanición de cualquier sentido")
-    print("=" * 60)
+
 
 
 if __name__ == "__main__":

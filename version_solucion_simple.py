@@ -1,59 +1,8 @@
-"""
-VERSIÓN 1 — SEGURA PERO INJUSTA.
-
-Autores:
-Jefferson Gomez
-Juan Camilo Morales 
-Marilyn Grijalba
-Juan Diego Quiñonez
-Jorge Castro
-=================================
-Escenario 1: Puente de un solo carril — Taller Final Concurrencia
-Curso: Sistemas Operativos — Universidad del Valle 2026-1
-
-Propósito de este archivo:
-    Resolver la condición de carrera usando Lock + Condition siguiendo
-    el patrón de Lectores-Escritores de Stallings Cap. 5.
-    El invariante NUNCA se viola. Pero existe inanición potencial:
-    si un sentido llega sin parar, el contrario espera indefinidamente.
-
-Analogía con Stallings Cap. 5 (Lectores-Escritores):
-    - Vehículos del MISMO sentido  → actúan como "lectores" entre sí
-      (comparten el recurso sin problema).
-    - Vehículos del sentido CONTRARIO → actúan como "escritores"
-      (necesitan exclusividad total respecto al otro sentido).
-    - Patrón: el PRIMER vehículo de un sentido "toma" el puente,
-      el ÚLTIMO lo "libera" para el otro sentido.
-
-Donde la analogía se rompe (importante para el pitch):
-    En el problema clásico la asimetría es fija: lectores siempre
-    comparten, escritores siempre necesitan exclusividad.
-    Aquí ambos sentidos son SIMÉTRICAMENTE "escritores" el uno
-    respecto al otro. No hay un rol fijo; depende de quién llegó primero.
-"""
-
 import threading
 import time
 import random
 
-# ──────────────────────────────────────────────
-# Primitivas (Stallings Cap. 5, sección Semáforos / Monitores)
-# threading.Condition envuelve un Lock y agrega wait/notify,
-# equivalente al monitor de Stallings.
-# ──────────────────────────────────────────────
-
 class PuenteSeguro:
-    """
-    Implementa el puente con exclusión mutua direccional.
-
-    Invariante de seguridad:
-        En todo momento: NOT (norte_en_puente > 0 AND sur_en_puente > 0)
-
-    Patrón (Stallings Cap. 5 — primer/último lector):
-        - Primer vehículo de un sentido: adquiere el recurso.
-        - Último vehículo de un sentido: libera el recurso.
-        - Los intermedios entran libremente mientras el sentido sea el mismo.
-    """
 
     def __init__(self):
         self._condition      = threading.Condition()  # Lock + wait/notify
@@ -68,26 +17,13 @@ class PuenteSeguro:
 
     # ── INVARIANTE EJECUTABLE ────────────────────────────────────
     def _verificar_invariante(self):
-        """
-        Aborta si el invariante se viola.
-        Se llama DENTRO de la sección crítica (con lock tomado).
-        """
         assert not (self._norte_en_puente > 0 and self._sur_en_puente > 0), (
-            f"¡INVARIANTE VIOLADO! "
+            f" INVARIANTE VIOLADO "
             f"Norte={self._norte_en_puente}, Sur={self._sur_en_puente}"
         )
 
     # ── ENTRADA AL PUENTE ────────────────────────────────────────
     def entrar(self, vid, direction):
-        """
-        Un vehículo solicita entrar al puente.
-
-        Bloquea si el puente está ocupado por el sentido contrario.
-        Varios vehículos del mismo sentido pueden entrar a la vez.
-
-        Equivalente Stallings: readcount++ con mutex, primer lector
-        bloquea wsem para excluir escritores.
-        """
         with self._condition:
             # Espera activa eficiente (wait libera el lock mientras duerme)
             while self._direction is not None and self._direction != direction:
@@ -108,15 +44,6 @@ class PuenteSeguro:
 
     # ── SALIDA DEL PUENTE ────────────────────────────────────────
     def salir(self, vid, direction):
-        """
-        Un vehículo sale del puente.
-
-        Si es el ÚLTIMO del sentido actual, libera el puente
-        y notifica a todos los que esperan.
-
-        Equivalente Stallings: readcount-- con mutex, último lector
-        libera wsem para que escritores puedan entrar.
-        """
         with self._condition:
             self._en_puente -= 1
             if direction == "NORTE":
@@ -140,11 +67,6 @@ def vehiculo(vid, direction, puente, tiempo_cruce=0.05):
 
 # ── DEMOSTRACIÓN DE INANICIÓN ────────────────────────────────────
 def demo_inaniacion():
-    """
-    Muestra que con tráfico denso en NORTE, los vehículos del SUR
-    pueden tardar mucho o no cruzar si el generador de norte
-    no para. Este es el problema de equidad que resuelve la V2.
-    """
     print()
     print("── Demo inanición potencial ──────────────────────────")
     puente = PuenteSeguro()
@@ -169,11 +91,9 @@ def demo_inaniacion():
         time.sleep(0.02)
         puente.salir(vid, "SUR")
 
-    # Lanza el generador norte en background
     gen_norte = threading.Thread(target=vehiculo_norte_continuo)
     gen_norte.start()
 
-    # Intenta meter 5 vehículos del sur
     time.sleep(0.1)  # Deja que el norte tome el puente
     hilos_sur = []
     for i in range(5):
@@ -188,15 +108,10 @@ def demo_inaniacion():
 
     print(f"  Tiempo de espera vehículos SUR: "
           f"{[f'{t:.3f}s' for t in tiempos_sur]}")
-    print("  Observación: con carga adversa norte, el sur puede esperar")
-    print("  mucho tiempo. En V2 esto se corrige con equidad.")
+    print("")
 
 
 def main():
-    print("=" * 60)
-    print("VERSIÓN 1 — SEGURA (pero potencialmente injusta)")
-    print("Patrón: Lectores-Escritores (Stallings Cap. 5)")
-    print("=" * 60)
 
     puente = PuenteSeguro()
     hilos  = []
@@ -221,13 +136,10 @@ def main():
     print(f"  Cruzados Norte: {puente.total_cruzados['NORTE']}")
     print(f"  Cruzados Sur  : {puente.total_cruzados['SUR']}")
     print(f"  Máximo simultáneo en puente: {puente.max_simultaneos}")
-    print(f"  Invariante: NUNCA violado ✓")
+    print(f"  Invariante: NUNCA violado ")
     print()
-    print("  Problema: si el norte llegara sin parar, el sur esperaría")
-    print("  indefinidamente → INANICIÓN. Ver demo a continuación.")
 
     demo_inaniacion()
-    print("=" * 60)
 
 
 if __name__ == "__main__":
