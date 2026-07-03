@@ -1,8 +1,8 @@
 """
-VERSIÓN 1 — SEGURA PERO INJUSTA
+VERSIÓN 1 — SEGURA PERO INJUSTA.
 
 Autores:
-Jefferson Gomez 
+Jefferson Gomez
 Juan Camilo Morales 
 Marilyn Grijalba
 Juan Diego Quiñonez
